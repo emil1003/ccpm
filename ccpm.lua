@@ -333,13 +333,13 @@ elseif method == "list" then
 			local package = installedPackages[name]
 			local upgradable = sourceCache[name]
 
-			out(name.." ("..package.version.." to "..upgradable.version..")")
+			out(name.." (version "..package.version..", upgradable to "..upgradable.version..")")
 		end
 	else
 		out("Listing installed packages", colors.lightBlue)
 
 		for _, package in pairs(installedPackages) do
-			out(package.name.." ("..package.version..")")
+			out(package.name.." (version "..package.version..")")
 		end
 	end
 elseif method == "clean" then
