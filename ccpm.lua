@@ -191,15 +191,23 @@ if method == "update" then
 	local sourcesFailed = 0
 	readConfigs(true, true, true)
 	out("Updating package lists...", colors.lightBlue)
+
+	if next(sources) == nil then
+		out("No sources configured", colors.red)
+		return
+	end
+
 	for i = 1, #sources do
 		local srcList = httpRequest(sources[i], true)
 		if srcList then
 			for j = 1, #srcList.packages do
 				local package = srcList.packages[j]
 
-				local fetchUrl = srcList.packageFetchUrl:gsub("$name", package.name)
-				fetchUrl = fetchUrl:gsub("$version", package.version)
-				package.fetchUrl = fetchUrl
+				if not package.fetchUrl then
+					local fetchUrl = srcList.packageFetchUrl:gsub("$name", package.name)
+					fetchUrl = fetchUrl:gsub("$version", package.version)
+					package.fetchUrl = fetchUrl
+				end
 
 				sourceCache[package.name] = package
 			end
