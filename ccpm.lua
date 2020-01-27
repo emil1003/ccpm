@@ -155,6 +155,16 @@ local function httpRequest(url, jsonDecode)
 	end
 end
 
+local function populateSource(url, srcList)
+	for i = 1, #sources do
+		if sources[i].url == url then
+			sources[i].name = srcList.name
+			sources[i].description = srcList.description
+			break
+		end
+	end
+end
+
 local function fetchPackage(package)
 	fs.makeDir("/.ccpm/packages/"..package.name)
 
@@ -198,8 +208,14 @@ if method == "update" then
 	end
 
 	for i = 1, #sources do
-		local srcList = httpRequest(sources[i], true)
+		local source = sources[i]
+		local srcList = nil
+		if source.active then
+			srcList = httpRequest(source.url, true)
+		end
+
 		if srcList then
+			populateSource(source.url, srcList)
 			for j = 1, #srcList.packages do
 				local package = srcList.packages[j]
 
@@ -211,10 +227,13 @@ if method == "update" then
 
 				sourceCache[package.name] = package
 			end
-		else
+		elseif source.active then
 			sourcesFailed = sourcesFailed + 1
 		end
 	end
+	out("Writing sources...", colors.gray)
+	writeFile("/.ccpm/sources.list", textutils.serialize(sources))
+
 	out("Writing source cache...", colors.gray)
 	writeFile("/.ccpm/cache.list", textutils.serialize(sourceCache))
 
@@ -275,6 +294,9 @@ elseif method == "install" then
 			else
 				out("Installing "..package.name.." failed", colors.red)
 			end
+		else
+			out("Fetching package failed, aborting", colors.red)
+			return
 		end
 	end
 
@@ -339,7 +361,64 @@ elseif method == "show" then
 	for key, val in pairs(package) do
 		out(key..": "..val)
 	end
+elseif method == "source" then
+	local doSave = false
+	readConfigs(true)
 
+	if args[2] == "list" then
+		out("Listing sources", colors.lightBlue)
+
+		for i, source in ipairs(sources) do
+			if source.name then
+				out(i..": "..source.name.." ("..source.url..")")
+			else
+				out(i..": "..source.url.." (NYP)")
+			end
+		end
+	elseif args[2] == "add" then
+		if not args[3] then
+			out("No URL specified", colors.red)
+			return
+		end
+
+		out("Creating source with URL: "..args[3], colors.lightGray)
+		source = {}
+		source.url = args[3]
+		source.active = true
+
+		table.insert(sources, source)
+		out("Added source; run 'ccpm update' to use", colors.lime)
+		doSave = true
+	elseif args[2] == "remove" then
+		for i, source in ipairs(sources) do
+			if i == tonumber(args[3]) then
+				table.remove(sources, i)
+				out("Removed source with URL: "..source.url, colors.lime)
+				doSave = true
+				break
+			end
+		end
+	elseif args[2] == "toggle" then
+		if not args[3] then
+			out("No source index specified", colors.red)
+			return
+		end
+		for i, source in ipairs(sources) do
+			if i == tonumber(args[3]) then
+				source.active = not source.active
+				out((source.active and "Enabled" or "Disabled").." source with URL: "..source.url, colors.lime)
+				doSave = true
+				break
+			end
+		end
+	else
+		out("Unknown argument"..(args[2] and ": "..args[2] or ""), colors.red)
+	end
+
+	if doSave then
+		out("Writing sources...", colors.gray)
+		writeFile("/.ccpm/sources.list", textutils.serialize(sources))
+	end
 else
 	if method == nil then
 		out("Nothing to do, exiting", colors.lightBlue)
