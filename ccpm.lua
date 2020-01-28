@@ -109,6 +109,14 @@ local function ensureFileStructure()
 	end
 end
 
+local function ensureVariable(var, typedef)
+	if var == nil then
+		out(typedef.." not specified", colors.red)
+		return false
+	end
+	return true
+end
+
 local function readConfigs(bSources, bSourcesCache, bPackages)
 	if bSources then
 		out("Reading sources...", colors.gray)
@@ -126,7 +134,7 @@ end
 
 
 local function httpRequest(url, jsonDecode)
-	out("Fetching "..url)
+	out("Fetching "..url, colors.cyan)
 
 	local h
 
@@ -148,8 +156,10 @@ local function httpRequest(url, jsonDecode)
 				out("Failed to determine format", colors.red)
 			end
 
+			out("Request succeeded", colors.lime)
 			return d
 		else
+			out("Request succeeded", colors.lime)
 			return data
 		end
 	end
@@ -188,13 +198,7 @@ local function determineDifferences()
 	return diff
 end
 
-
-
-
-
-
-
-
+--Begin
 ensureFileStructure()
 
 if method == "update" then
@@ -346,6 +350,7 @@ elseif method == "clean" then
 	out("Cleaning package cache...", colors.lightBlue)
 	fs.delete("/.ccpm/packages")
 	fs.delete("/.ccpm/cache.list")
+	return
 
 elseif method == "show" then
 	readConfigs(false, true, false)
@@ -369,17 +374,16 @@ elseif method == "source" then
 		out("Listing sources", colors.lightBlue)
 
 		for i, source in ipairs(sources) do
+			term.setTextColor(source.active and colors.lime or colors.red)
+			write(i..": ")
 			if source.name then
-				out(i..": "..source.name.." ("..source.url..")")
+				out(source.name.." ("..source.url..")", colors.white)
 			else
-				out(i..": "..source.url.." (NYP)")
+				out(source.url.." (NYP)", colors.white)
 			end
 		end
 	elseif args[2] == "add" then
-		if not args[3] then
-			out("No URL specified", colors.red)
-			return
-		end
+		if not ensureVariable(args[3], "URL") then return end
 
 		out("Creating source with URL: "..args[3], colors.lightGray)
 		source = {}
@@ -390,6 +394,8 @@ elseif method == "source" then
 		out("Added source; run 'ccpm update' to use", colors.lime)
 		doSave = true
 	elseif args[2] == "remove" then
+		if not ensureVariable(args[3], "Source index") then return end
+
 		for i, source in ipairs(sources) do
 			if i == tonumber(args[3]) then
 				table.remove(sources, i)
@@ -399,10 +405,8 @@ elseif method == "source" then
 			end
 		end
 	elseif args[2] == "toggle" then
-		if not args[3] then
-			out("No source index specified", colors.red)
-			return
-		end
+		if not ensureVariable(args[3], "Source index") then return end
+
 		for i, source in ipairs(sources) do
 			if i == tonumber(args[3]) then
 				source.active = not source.active
@@ -411,6 +415,19 @@ elseif method == "source" then
 				break
 			end
 		end
+	elseif args[2] == "show" then
+		if not ensureVariable(args[3], "Source index") then return end
+
+		for i, source in ipairs(sources) do
+			if i == tonumber(args[3]) then
+				out("Showing source properties", colors.lightBlue)
+				for key, val in pairs(source) do
+					out(key..": "..tostring(val))
+				end
+				return
+			end
+		end
+		out("Source with index "..i.." not found", colors.red)
 	else
 		out("Unknown argument"..(args[2] and ": "..args[2] or ""), colors.red)
 	end
@@ -426,7 +443,3 @@ else
 		out("Unknown command: "..method, colors.red)
 	end
 end
-
-
-
-
