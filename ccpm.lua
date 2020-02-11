@@ -1,6 +1,7 @@
 --[[
 	ComputerCraft Package Manager (ccpm)
 ]]
+local version = "0.0.1"
 
 local args = {...}
 local method = args[1]
@@ -197,6 +198,23 @@ local function determineDifferences()
 	end
 	return diff
 end
+
+local function outHelp()
+	out("CCPM "..version)
+	print()
+	out("Usage: ccpm command [arguments]", colors.lightBlue)
+	print()
+	out("Available commands:")
+	out("  update: Fetch package lists from sources")
+	out("  install: Install packages")
+	out("  upgrade: Upgrades installed packages")
+	out("  list: Lists installed packages")
+	out("  clean: Remove cached content")
+	out("  show: See package details")
+	out("  source: Manipulate sources")
+	out("  help: Show this text")
+end
+
 
 --Begin
 ensureFileStructure()
@@ -436,8 +454,12 @@ elseif method == "source" then
 		out("Writing sources...", colors.gray)
 		writeFile("/.ccpm/sources.list", textutils.serialize(sources))
 	end
+elseif method == "help" then
+	outHelp()
+	return
 else
 	if method == nil then
+		outHelp()
 		out("Nothing to do, exiting", colors.lightBlue)
 	else
 		out("Unknown command: "..method, colors.red)
