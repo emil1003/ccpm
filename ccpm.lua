@@ -211,6 +211,7 @@ local function outHelp()
 	out("  list: Lists installed packages")
 	out("  clean: Remove cached content")
 	out("  show: See package details")
+	out("  search: Search in package cache")
 	out("  source: Manipulate sources")
 	out("  help: Show this text")
 end
@@ -368,8 +369,8 @@ elseif method == "clean" then
 	out("Cleaning package cache...", colors.lightBlue)
 	fs.delete("/.ccpm/packages")
 	fs.delete("/.ccpm/cache.list")
+	out("Caches cleaned", colors.lime)
 	return
-
 elseif method == "show" then
 	readConfigs(false, true, false)
 	local package = sourceCache[args[2]]
@@ -445,7 +446,7 @@ elseif method == "source" then
 				return
 			end
 		end
-		out("Source with index "..i.." not found", colors.red)
+		out("Source with index "..args[3].." not found", colors.red)
 	else
 		out("Unknown argument"..(args[2] and ": "..args[2] or ""), colors.red)
 	end
@@ -454,6 +455,20 @@ elseif method == "source" then
 		out("Writing sources...", colors.gray)
 		writeFile("/.ccpm/sources.list", textutils.serialize(sources))
 	end
+elseif method == "search" then
+	readConfigs(false, true)
+	if not ensureVariable(args[2], "Search string") then return end
+
+	out("Searching package cache...", colors.lightBlue)
+
+	for _, package in pairs(sourceCache) do
+		if string.find(package.name:lower(), args[2]) then
+			out(package.name.." v"..package.version, colors.green)
+			out(package.description)
+			print()
+		end
+	end
+
 elseif method == "help" then
 	outHelp()
 	return
