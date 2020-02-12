@@ -207,6 +207,7 @@ local function outHelp()
 	out("Available commands:")
 	out("  update: Fetch package lists from sources")
 	out("  install: Install packages")
+	out("  remove: Remove an installed package")
 	out("  upgrade: Upgrades installed packages")
 	out("  list: Lists installed packages")
 	out("  clean: Remove cached content")
@@ -327,6 +328,23 @@ elseif method == "install" then
 
 	out("Writing package list...", colors.gray)
 	writeFile("/.ccpm/packages.list", textutils.serialize(installedPackages))
+elseif method == "remove" then
+	readConfigs(false, false, true)
+	if not ensureVariable(args[2], "Package name") then return end
+
+	for _, package in pairs(installedPackages) do
+		if package.name == args[2] then
+			out("Removing package "..package.name, colors.lightGray)
+			installedPackages[package.name] = nil
+			out("Package removed: "..package.name, colors.lime)
+
+			out("Writing package list...", colors.gray)
+			writeFile("/.ccpm/packages.list", textutils.serialize(installedPackages))
+			return
+		end
+	end
+
+	out("Package not found: "..args[2], colors.red)
 
 elseif method == "upgrade" then
 	readConfigs(false, true, true)
