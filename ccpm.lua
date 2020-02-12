@@ -244,6 +244,7 @@ if method == "update" then
 
 				if not package.fetchUrl then
 					local fetchUrl = srcList.packageFetchUrl:gsub("$name", package.name)
+					fetchUrl = fetchUrl:gsub("$versionName", package.versionName)
 					fetchUrl = fetchUrl:gsub("$version", package.version)
 					package.fetchUrl = fetchUrl
 				end
@@ -358,7 +359,11 @@ elseif method == "list" then
 
 			term.setTextColor(colors.green)
 			write(package.name)
-			out("/"..upgradable.version.." [upgradable from "..package.version.."]")
+			out("/"..
+				(upgradable.versionName and upgradable.versionName or upgradable.version)..
+				" [upgradable from "..
+				(package.versionName and package.versionName or package.version)..
+				"]")
 		end
 	else
 		out("Listing installed packages", colors.lightBlue)
@@ -366,7 +371,7 @@ elseif method == "list" then
 		for _, package in pairs(installedPackages) do
 			term.setTextColor(colors.green)
 			write(package.name)
-			out("/"..package.version)
+			out("/"..(package.versionName and package.versionName or package.version))
 		end
 	end
 elseif method == "clean" then
@@ -469,7 +474,7 @@ elseif method == "search" then
 		if string.find(package.name:lower(), args[2]) then
 			term.setTextColor(colors.green)
 			write(package.name)
-			out("/"..package.version)
+			out("/"..(package.versionName and package.versionName or package.version))
 			out("  "..package.description)
 			print()
 		end
