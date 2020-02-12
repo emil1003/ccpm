@@ -356,13 +356,17 @@ elseif method == "list" then
 			local package = installedPackages[name]
 			local upgradable = sourceCache[name]
 
-			out(name.." (version "..package.version..", upgradable to "..upgradable.version..")")
+			term.setTextColor(colors.green)
+			write(package.name)
+			out("/"..upgradable.version.." [upgradable from "..package.version.."]")
 		end
 	else
 		out("Listing installed packages", colors.lightBlue)
 
 		for _, package in pairs(installedPackages) do
-			out(package.name.." (version "..package.version..")")
+			term.setTextColor(colors.green)
+			write(package.name)
+			out("/"..package.version)
 		end
 	end
 elseif method == "clean" then
@@ -463,8 +467,10 @@ elseif method == "search" then
 
 	for _, package in pairs(sourceCache) do
 		if string.find(package.name:lower(), args[2]) then
-			out(package.name.." v"..package.version, colors.green)
-			out(package.description)
+			term.setTextColor(colors.green)
+			write(package.name)
+			out("/"..package.version)
+			out("  "..package.description)
 			print()
 		end
 	end
