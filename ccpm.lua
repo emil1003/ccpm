@@ -360,9 +360,9 @@ elseif method == "list" then
 			term.setTextColor(colors.green)
 			write(package.name)
 			out("/"..
-				(upgradable.versionName and upgradable.versionName or upgradable.version)..
+				(upgradable.versionName or upgradable.version)..
 				" [upgradable from "..
-				(package.versionName and package.versionName or package.version)..
+				(package.versionName or package.version)..
 				"]")
 		end
 	else
@@ -371,7 +371,7 @@ elseif method == "list" then
 		for _, package in pairs(installedPackages) do
 			term.setTextColor(colors.green)
 			write(package.name)
-			out("/"..(package.versionName and package.versionName or package.version))
+			out("/"..(package.versionName or package.version))
 		end
 	end
 elseif method == "clean" then
@@ -468,13 +468,18 @@ elseif method == "search" then
 	readConfigs(false, true)
 	if not ensureVariable(args[2], "Search string") then return end
 
+	if next(sourceCache) == nil then
+		out("Package cache empty, do 'ccpm update' first", colors.red)
+		return
+	end
+
 	out("Searching package cache...", colors.lightBlue)
 
 	for _, package in pairs(sourceCache) do
 		if string.find(package.name:lower(), args[2]) then
 			term.setTextColor(colors.green)
 			write(package.name)
-			out("/"..(package.versionName and package.versionName or package.version))
+			out("/"..(package.versionName or package.version))
 			out("  "..package.description)
 			print()
 		end
