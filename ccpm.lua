@@ -193,10 +193,30 @@ local function determineDifferences()
 	local diff = {}
 	for _, package in pairs(installedPackages) do
 		if package.version < sourceCache[package.name]["version"] then
-			table.insert(diff, package.name)
+			table.insert(diff, package)
 		end
 	end
 	return diff
+end
+
+local function tabulatePackages(table)
+	local w, _ = term.getSize()
+	local lineWidth = 2
+
+	write("  ")
+
+	for _, package in pairs(table) do
+		if lineWidth + #package.name + 1 < w then
+			write(package.name.." ")
+			lineWidth = lineWidth + #package.name + 1
+		else
+			print(package.name)
+			write("  ")
+			lineWidth = 2
+		end
+	end
+
+	if lineWidth > 2 then print() end
 end
 
 local function outHelp()
@@ -262,7 +282,7 @@ if method == "update" then
 	out("Writing source cache...", colors.gray)
 	writeFile("/.ccpm/cache.list", textutils.serialize(sourceCache))
 
-	out("Calculating differences...")
+	out("Calculating differences...", colors.lightGray)
 
 	local diff = determineDifferences()
 
@@ -353,6 +373,37 @@ elseif method == "upgrade" then
 		out("Package cache empty, do 'ccpm update' first", colors.red)
 		return
 	end
+
+	out("Calculating differences...", colors.lightGray)
+
+	local diff = determineDifferences()
+
+	if #diff == 0 then
+		out("All packages are up-to-date", colors.lime)
+		return
+	end
+
+	out("The following packages are due for upgrade", colors.lightBlue)
+	term.setTextColor(colors.white)
+
+	tabulatePackages(diff)
+
+	out("Do you want to continue [Y/n]", colors.lightBlue)
+
+	while true do
+		local e = {os.pullEvent()}
+
+		if e[1] == "key" then
+			if e[2] == 28 or e[2] == 21 then
+				break
+			elseif e[2] == 1 or e[2] == 49 then
+				out("Aborting...", colors.red)
+				return
+			end
+		end
+	end
+
+
 
 
 
