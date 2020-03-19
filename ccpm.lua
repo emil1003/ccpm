@@ -422,9 +422,8 @@ elseif method == "list" then
 
 		local diff = determineDifferences()
 
-		for _, name in ipairs(diff) do
-			local package = installedPackages[name]
-			local upgradable = sourceCache[name]
+		for _, package in ipairs(diff) do
+			local upgradable = sourceCache[package.name]
 
 			term.setTextColor(colors.green)
 			write(package.name)
