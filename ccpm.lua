@@ -3,8 +3,10 @@
 ]]
 local version = "0.0.1"
 
-local args = {...}
-local method = args[1]
+local cmds = {}
+local method = nil
+
+local logLevel = 0
 
 local sourceCache = {}
 local sources = {}
@@ -71,9 +73,11 @@ local JSON = setmetatable( {}, { __index = _G } )
 select( 1, load( JSON_API, "JSON_API", "t", JSON ) )()
 
 
-local function out(text, color)
-	term.setTextColor(color or 1)
-	print(text)
+local function out(text, color, level)
+	if (logLevel >= (level or 0)) then
+		term.setTextColor(color or 1)
+		print(text)
+	end
 end
 
 local function readFile(path)
@@ -120,15 +124,15 @@ end
 
 local function readConfigs(bSources, bSourcesCache, bPackages)
 	if bSources then
-		out("Reading sources...", colors.gray)
+		out("Reading sources...", colors.gray, 1)
 		sources = textutils.unserialize(readFile("/.ccpm/sources.list"))
 	end
 	if bSourcesCache then
-		out("Reading source cache...", colors.gray)
+		out("Reading source cache...", colors.gray, 1)
 		sourceCache = textutils.unserialize(readFile("/.ccpm/cache.list"))
 	end
 	if bPackages then
-		out("Reading package list...", colors.gray)
+		out("Reading package list...", colors.gray, 1)
 		installedPackages = textutils.unserialize(readFile("/.ccpm/packages.list"))
 	end
 end
@@ -239,6 +243,26 @@ end
 
 
 --Begin
+for _, arg in ipairs({...}) do
+
+	--Test if arg is argument
+	if string.sub(arg, 1, 1) == "-" then
+		if arg == "-d" then
+			logLevel = 1
+		else
+			--TODO: Consider breaking to avoid operational errors
+			out("Unknown argument: "..arg, colors.lightGray)
+		end
+	else
+		--arg is command
+		if not method then
+			method = arg
+		else
+			table.insert(cmds, arg)
+		end
+	end
+end
+
 ensureFileStructure()
 
 if method == "update" then
@@ -276,13 +300,13 @@ if method == "update" then
 			sourcesFailed = sourcesFailed + 1
 		end
 	end
-	out("Writing sources...", colors.gray)
+	out("Writing sources...", colors.gray, 1)
 	writeFile("/.ccpm/sources.list", textutils.serialize(sources))
 
-	out("Writing source cache...", colors.gray)
+	out("Writing source cache...", colors.gray, 1)
 	writeFile("/.ccpm/cache.list", textutils.serialize(sourceCache))
 
-	out("Calculating differences...", colors.lightGray)
+	out("Calculating differences...", colors.lightGray, 1)
 
 	local diff = determineDifferences()
 
@@ -307,10 +331,7 @@ elseif method == "install" then
 		return
 	end
 
-	local packagesToInstall = {}
-	for i = 2, #args do
-		table.insert(packagesToInstall, args[i])
-	end
+	local packagesToInstall = cmds
 
 	if #packagesToInstall == 0 then
 		out("No package specified", colors.red)
@@ -346,25 +367,25 @@ elseif method == "install" then
 	end
 
 
-	out("Writing package list...", colors.gray)
+	out("Writing package list...", colors.gray, 1)
 	writeFile("/.ccpm/packages.list", textutils.serialize(installedPackages))
 elseif method == "remove" then
 	readConfigs(false, false, true)
-	if not ensureVariable(args[2], "Package name") then return end
+	if not ensureVariable(cmds[1], "Package name") then return end
 
 	for _, package in pairs(installedPackages) do
-		if package.name == args[2] then
+		if package.name == cmds[1] then
 			out("Removing package "..package.name, colors.lightGray)
 			installedPackages[package.name] = nil
 			out("Package removed: "..package.name, colors.lime)
 
-			out("Writing package list...", colors.gray)
+			out("Writing package list...", colors.gray, 1)
 			writeFile("/.ccpm/packages.list", textutils.serialize(installedPackages))
 			return
 		end
 	end
 
-	out("Package not found: "..args[2], colors.red)
+	out("Package not found: "..cmds[1], colors.red)
 
 elseif method == "upgrade" then
 	readConfigs(false, true, true)
@@ -374,7 +395,7 @@ elseif method == "upgrade" then
 		return
 	end
 
-	out("Calculating differences...", colors.lightGray)
+	out("Calculating differences...", colors.lightGray, 1)
 
 	local diff = determineDifferences()
 
@@ -410,7 +431,7 @@ elseif method == "upgrade" then
 elseif method == "list" then
 	readConfigs(false, false, true)
 
-	if args[2] == "upgradable" then
+	if cmds[1] == "upgradable" then
 		readConfigs(false, true)
 
 		if next(sourceCache) == nil then
@@ -450,7 +471,7 @@ elseif method == "clean" then
 	return
 elseif method == "show" then
 	readConfigs(false, true, false)
-	local package = sourceCache[args[2]]
+	local package = sourceCache[cmds[1]]
 
 	if not package then
 		out("Package not found", colors.red)
@@ -466,7 +487,7 @@ elseif method == "source" then
 	local doSave = false
 	readConfigs(true)
 
-	if args[2] == "list" then
+	if cmds[1] == "list" then
 		out("Listing sources", colors.lightBlue)
 
 		for i, source in ipairs(sources) do
@@ -478,44 +499,44 @@ elseif method == "source" then
 				out(source.url.." (NYP)", colors.white)
 			end
 		end
-	elseif args[2] == "add" then
-		if not ensureVariable(args[3], "URL") then return end
+	elseif cmds[1] == "add" then
+		if not ensureVariable(cmds[2], "URL") then return end
 
-		out("Creating source with URL: "..args[3], colors.lightGray)
+		out("Creating source with URL: "..cmds[2], colors.lightGray)
 		source = {}
-		source.url = args[3]
+		source.url = cmds[2]
 		source.active = true
 
 		table.insert(sources, source)
 		out("Added source; run 'ccpm update' to use", colors.lime)
 		doSave = true
-	elseif args[2] == "remove" then
-		if not ensureVariable(args[3], "Source index") then return end
+	elseif cmds[1] == "remove" then
+		if not ensureVariable(cmds[2], "Source index") then return end
 
 		for i, source in ipairs(sources) do
-			if i == tonumber(args[3]) then
+			if i == tonumber(cmds[2]) then
 				table.remove(sources, i)
 				out("Removed source with URL: "..source.url, colors.lime)
 				doSave = true
 				break
 			end
 		end
-	elseif args[2] == "toggle" then
-		if not ensureVariable(args[3], "Source index") then return end
+	elseif cmds[1] == "toggle" then
+		if not ensureVariable(cmds[2], "Source index") then return end
 
 		for i, source in ipairs(sources) do
-			if i == tonumber(args[3]) then
+			if i == tonumber(cmds[2]) then
 				source.active = not source.active
 				out((source.active and "Enabled" or "Disabled").." source with URL: "..source.url, colors.lime)
 				doSave = true
 				break
 			end
 		end
-	elseif args[2] == "show" then
-		if not ensureVariable(args[3], "Source index") then return end
+	elseif cmds[1] == "show" then
+		if not ensureVariable(cmds[2], "Source index") then return end
 
 		for i, source in ipairs(sources) do
-			if i == tonumber(args[3]) then
+			if i == tonumber(cmds[2]) then
 				out("Showing source properties", colors.lightBlue)
 				for key, val in pairs(source) do
 					out(key..": "..tostring(val))
@@ -523,18 +544,18 @@ elseif method == "source" then
 				return
 			end
 		end
-		out("Source with index "..args[3].." not found", colors.red)
+		out("Source with index "..cmds[2].." not found", colors.red)
 	else
-		out("Unknown argument"..(args[2] and ": "..args[2] or ""), colors.red)
+		out("Unknown argument"..(cmds[1] and ": "..cmds[1] or ""), colors.red)
 	end
 
 	if doSave then
-		out("Writing sources...", colors.gray)
+		out("Writing sources...", colors.gray, 1)
 		writeFile("/.ccpm/sources.list", textutils.serialize(sources))
 	end
 elseif method == "search" then
 	readConfigs(false, true)
-	if not ensureVariable(args[2], "Search string") then return end
+	if not ensureVariable(cmds[1], "Search string") then return end
 
 	if next(sourceCache) == nil then
 		out("Package cache empty, do 'ccpm update' first", colors.red)
@@ -544,7 +565,7 @@ elseif method == "search" then
 	out("Searching package cache...", colors.lightBlue)
 
 	for _, package in pairs(sourceCache) do
-		if string.find(package.name:lower(), args[2]) then
+		if string.find(package.name:lower(), cmds[1]) then
 			term.setTextColor(colors.green)
 			write(package.name)
 			out("/"..(package.versionName or package.version))
