@@ -89,7 +89,8 @@ end
 
 local function writeFile(path, data)
 	local h = fs.open(path, "w")
-	h.write(data)
+	local d = type(data) == "table" and textutils.serialize(data) or data
+	h.write(d)
 	h.close()
 end
 
