@@ -174,6 +174,7 @@ local function populateSource(url, srcList)
 	for i = 1, #sources do
 		if sources[i].url == url then
 			sources[i].name = srcList.name
+			sources[i].codeName = srcList.codeName
 			sources[i].description = srcList.description
 			break
 		end
@@ -196,9 +197,15 @@ end
 local function determineDifferences()
 	local diff = {}
 	for _, package in pairs(installedPackages) do
-		if package.version < sourceCache[package.name]["version"] then
-			table.insert(diff, package)
+		--Test if sources contain installed package
+		if sourceCache[package.name] then
+			if tonumber(package.version) < tonumber(sourceCache[package.name].version) then
+				out(package.name.." outdated", colors.gray, 2)
+				table.insert(diff, package)
+			end
 		end
+		--If above check fails, then package has no configured source
+		--TODO: Mark package as orphaned
 	end
 	return diff
 end
@@ -249,6 +256,8 @@ for _, arg in ipairs({...}) do
 	if string.sub(arg, 1, 1) == "-" then
 		if arg == "-d" then
 			logLevel = 1
+		elseif arg =="-dd" then
+			logLevel = 2
 		else
 			--TODO: Consider breaking to avoid operational errors
 			out("Unknown argument: "..arg, colors.lightGray)
@@ -283,9 +292,11 @@ if method == "update" then
 		end
 
 		if srcList then
+			--out("Parsing packages from "..source.codeName, colors.gray, 2)
 			populateSource(source.url, srcList)
 			for j = 1, #srcList.packages do
 				local package = srcList.packages[j]
+				package.source = source.codeName
 
 				if not package.fetchUrl then
 					local fetchUrl = srcList.packageFetchUrl:gsub("$name", package.name)
@@ -294,7 +305,19 @@ if method == "update" then
 					package.fetchUrl = fetchUrl
 				end
 
-				sourceCache[package.name] = package
+				--Test if package already in cache
+				if sourceCache[package.name] then
+					--Don't insert if source version is lower than cached version
+					if tonumber(sourceCache[package.name].version) < tonumber(package.version) then
+						out(package.name.." newest from "..source.codeName..", inserting", colors.gray, 2)
+						sourceCache[package.name] = package
+					else
+						out("Cache has newer version of "..package.name..", skipping", colors.gray, 2)
+					end
+				else
+					out("New package: "..package.name..", inserting", colors.gray, 2)
+					sourceCache[package.name] = package
+				end
 			end
 		elseif source.active then
 			sourcesFailed = sourcesFailed + 1
@@ -448,7 +471,7 @@ elseif method == "list" then
 
 			term.setTextColor(colors.green)
 			write(package.name)
-			out("/"..
+			out("/"..package.source.." "..
 				(upgradable.versionName or upgradable.version)..
 				" [upgradable from "..
 				(package.versionName or package.version)..
@@ -460,7 +483,7 @@ elseif method == "list" then
 		for _, package in pairs(installedPackages) do
 			term.setTextColor(colors.green)
 			write(package.name)
-			out("/"..(package.versionName or package.version))
+			out("/"..package.source.." "..(package.versionName or package.version))
 		end
 	end
 elseif method == "clean" then
@@ -568,7 +591,7 @@ elseif method == "search" then
 		if string.find(package.name:lower(), cmds[1]) then
 			term.setTextColor(colors.green)
 			write(package.name)
-			out("/"..(package.versionName or package.version))
+			out("/"..package.source.." "..(package.versionName or package.version))
 			out("  "..package.description)
 			print()
 		end
