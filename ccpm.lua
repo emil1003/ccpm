@@ -7,6 +7,8 @@ local cmds = {}
 local method = nil
 
 local logLevel = 0
+local assumeYes = false
+local skipMissing = false
 
 local sourceCache = {}
 local sources = {}
@@ -188,7 +190,7 @@ local function fetchPackage(package)
 	local data = httpRequest(package.fetchUrl)
 
 	if data then
-		writeFile("/.ccpm/packages/"..package.name.."/"..package.version, data)
+		writeFile("/.ccpm/packages/"..package.name.."/install.lua", data)
 		return true
 	else
 		return false
@@ -259,6 +261,10 @@ for _, arg in ipairs({...}) do
 			logLevel = 1
 		elseif arg =="-dd" then
 			logLevel = 2
+		elseif arg == "-y" then
+			assumeYes = true
+		elseif arg == "-m" then
+			skipMissing = true
 		else
 			--TODO: Consider breaking to avoid operational errors
 			out("Unknown argument: "..arg, colors.lightGray)
@@ -370,12 +376,10 @@ elseif method == "install" then
 
 		local package = sourceCache[packagesToInstall[i]]
 
-		out("Preparing to install "..package.name, colors.lightBlue)
-
 		if fetchPackage(package) then
-			out("Running setup script...")
+			out("Preparing to unpack "..package.name.." ["..package.versionName.."]", colors.white)
 
-			local state = shell.run("/.ccpm/packages/"..package.name.."/"..package.version)
+			local state = shell.run("/.ccpm/packages/"..package.name.."/install.lua", "install")
 
 			if state then
 				installedPackages[package.name] = sourceCache[package.name]
@@ -433,25 +437,68 @@ elseif method == "upgrade" then
 
 	tabulatePackages(diff)
 
-	out("Do you want to continue [Y/n]", colors.lightBlue)
+	out("Do you want to continue? [Y/n]", colors.lightBlue)
 
 	while true do
+		if assumeYes then break end
+
 		local e = {os.pullEvent()}
 
 		if e[1] == "key" then
-			if e[2] == 28 or e[2] == 21 then
+			if e[2] == 28 or e[2] == 21 then --Y or enter
 				break
-			elseif e[2] == 1 or e[2] == 49 then
+			elseif e[2] == 1 or e[2] == 49 then --N or escape
 				out("Aborting...", colors.red)
 				return
 			end
 		end
 	end
 
+	local skippedPackages = {}
 
+	local packagesToInstall = {}
+	for _, package in pairs(diff) do
+		table.insert(packagesToInstall, sourceCache[package.name])
+	end
 
+	for _, package in pairs(packagesToInstall) do
+		if not fetchPackage(package) then
+			if skipMissing then
+				out("Fetching "..package.name.." failed, skipping", colors.red)
+				table.insert(skippedPackages, package)
+			else
+				out("Fetching "..package.name.." failed", colors.red)
+				return
+			end
+		end
+	end
 
+	for _, package in pairs(packagesToInstall) do
+		local skip = false
+		for skipped in ipairs(skippedPackages) do
+			if skipped.name == package.name then
+				skip = true
+				break
+			end
+		end
 
+		if not skip then
+			out("Preparing to unpack "..package.name.." ["..package.versionName.."]", colors.white)
+
+			local state = shell.run("/.ccpm/packages/"..package.name.."/install.lua", "install")
+
+			if state then
+				installedPackages[package.name] = sourceCache[package.name]
+				out("Installed "..package.name.." successfully", colors.lime)
+				fs.delete("/.ccpm/packages/"..package.name)
+			else
+				out("Installing "..package.name.." failed", colors.red)
+			end
+		end
+	end
+
+	out("Writing package list...", colors.gray, 1)
+	writeFile("/.ccpm/packages.list", textutils.serialize(installedPackages))
 elseif method == "list" then
 	readConfigs(false, false, true)
 
